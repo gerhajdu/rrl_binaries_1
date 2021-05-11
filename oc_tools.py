@@ -28,10 +28,12 @@ from   numba           import jit
 colorC1 = (to_rgba('C1')[0],to_rgba('C1')[1],to_rgba('C1')[2],0.3)
 
 
-# This function solves the LTTE equations
 
 @jit(nopython=True)
 def calc_orbit(e, P_orb, T_peri, a_sini, omega, times):
+    """
+    This function solves the LTTE equations
+    """
     if e<0.3:
         loop=10
     else:
@@ -53,30 +55,34 @@ def calc_orbit(e, P_orb, T_peri, a_sini, omega, times):
     return LT
 
 
-# Function to calculate the semi-amplitude of the radial velocity
-
 def calc_K(e, P_orb, T_peri, a_sini, omega):
+    """
+    Function to calculate the semi-amplitude of the radial velocity
+    """
     K  = (2 * np.pi * a_sini / (P_orb *np.sqrt(1-e**2))) * 299792.458 
     
     return K
 
-# Function to calculate the mass function
-
 def calc_mass_function(a_sini, P_orb):
+    """
+    Function to calculate the mass function
+    """
     return ((a_sini**3)/(P_orb**2))* (173.14738217**3 * 365.2422**2)
 
-# Function to prepare the design matrix X for a Fourier series
-
 def return_harmonic_series(order, period, epochs):
+    """
+    Function to prepare the design matrix X for a Fourier series
+    """
     X=np.zeros((order*2, epochs.size))
     X[0::2]=np.sin( np.arange(1, order+1).reshape((-1,1)) * 2 * np.pi * epochs / period )
     X[1::2]=np.cos( np.arange(1, order+1).reshape((-1,1)) * 2 * np.pi * epochs / period )
     return X.T
 
-# Function to calculate the value of a Fourier series at arbitrary points in time
-# Used for plotting as well as calculating residuals
-
 def return_harmonic_LC(order,period,coefs,intercept,positions):
+    """
+    Function to calculate the value of a Fourier series at arbitrary points in time
+    Used for plotting as well as calculating residuals
+    """
     result=np.zeros(positions.size)
     for i in range(1,order+1):
         result=result +\
@@ -85,10 +91,11 @@ def return_harmonic_LC(order,period,coefs,intercept,positions):
     return result+intercept
 
 
-# This function calculates the difference in mean intensity between OGLE-III
-# and IV light curves, and matches to former to the latter
-
 def shift_int(jd3, mag3, jd4, mag4, order, period, plot=False):
+    """
+    This function calculates the difference in mean intensity between OGLE-III
+    and IV light curves, and matches to former to the latter
+    """
     int3 = 1/10**((mag3-15) * 0.4)
     X3 = return_harmonic_series(order, period, jd3)
     clf3=linear_model.LinearRegression()
@@ -134,16 +141,17 @@ def shift_int(jd3, mag3, jd4, mag4, order, period, plot=False):
     
     return mag3_new
 
-# This function is used to split the light curve into seasons, then split those seasons
-# into shorter sections 
-# Note that the detection of season borders in automatized
-
 def split_lc_seasons(jd,
                      limits       = np.array((0, 8, 80, 120, 160, 240, np.inf)),
                      into         = np.array((0, 1, 2,  3,   4,   5)),
                      granularity  = 10.,
                      plot         = False,
                      mag          = None):
+    """
+    This function is used to split the light curve into seasons, then
+    split those seasons into shorter sections 
+    Note that the detection of season borders in automatized
+    """
     
     trials      = np.arange(0., 365, granularity)
     first_phase = np.zeros_like(trials)
@@ -191,22 +199,25 @@ def split_lc_seasons(jd,
                     
     return masks
 
-
-# This function calculates the residuals for a given shift (trial O-C value),
-# which are minimized to determine the O-C values themselves
-
 def return_residuals(shift, jd, mag, coefs, intercept, period, order):
+    """
+    This function calculates the residuals for a given shift
+    (trial O-C value), which are minimized to determine the O-C
+    values themselves
+    """
     jd_s = jd - shift
     
     return mag - return_harmonic_LC(order,period,coefs,intercept,jd_s)
 
-# This function determines the O-C values by first fitting the light curve,
-# either for the original or the one with corrected timings from the first O-C fit,
-# if provided through the "jd_mod" optional variable. Errors are also calculated
-# and returned if the "bootstrap_times" optional variable is set to a positive
-# integer value
-
 def calc_oc_points(jd, mag, period, order, splits, bootstrap_times = 0, jd_mod = None, figure=False):
+    """
+    This function determines the O-C values by first fitting the
+    light curve,     either for the original or the one with
+    corrected timings from the first O-C fit, if provided through
+    the "jd_mod" optional variable. Errors are also calculated
+    and returned if the "bootstrap_times" optional variable is
+    set to a positive integer value
+    """
     oc_jd = np.zeros(splits.shape[0])
     oc_oc = np.zeros_like(oc_jd)
     oc_sd = np.zeros_like(oc_jd)
@@ -268,10 +279,12 @@ def calc_oc_points(jd, mag, period, order, splits, bootstrap_times = 0, jd_mod =
         return oc_jd, oc_oc, oc_sd
     
     
-# Helper function providing the residuals for the original formulation of the adopted
-# O-C shape (LTTE + parabola, with omega and e as variables)
-    
 def return_residuals_orbit(params, jd, oc, sd=1.):
+    """
+    Helper function providing the residuals for the original
+    formulation of the adopted O-C shape (LTTE + parabola,
+    with the omega and e variables fit directly)
+    """
     return (oc - calc_orbit(params[0], params[1], params[2], params[3], params[4], jd)\
            - params[5] - params[6]*jd - params[7]*jd*jd)/sd
 
@@ -279,6 +292,10 @@ def return_residuals_orbit(params, jd, oc, sd=1.):
 # function from Scipy
 
 def fit_oc1(oc_jd, oc_oc, jd, params, lower_bounds, upper_bounds, plot=True):
+    """
+    The function doing the initial O-C fit (LTTE + parabola)
+    using the least_squares function from Scipy
+    """
     lsq = least_squares(return_residuals_orbit, x0 = params, args=(oc_jd, oc_oc),
                     bounds = (lower_bounds, upper_bounds))
 
@@ -304,11 +321,11 @@ def fit_oc1(oc_jd, oc_oc, jd, params, lower_bounds, upper_bounds, plot=True):
 
     return lsq.x, jd2
 
-
-# The function calculating the log priors
-
 @jit(nopython=True)
 def log_prior(theta, prior_ranges):
+    """
+    The function calculating the log priors
+    """
     e = np.sqrt(theta[3]**2 + theta[4]**2)
 
     if e >= 1.0 or theta[0] < prior_ranges[0,0] or theta[0] > prior_ranges[0,1]\
@@ -323,23 +340,30 @@ def log_prior(theta, prior_ranges):
     
 @jit(nopython=True)
 def model(theta, x):
+    """
+    This function calculates the values of the adopted
+    LTTE + parabola shape at times x
+    """
     P_orb, T_peri, a_sini, esinomega, ecosomega, a, b, c = theta
-    e =         esinomega**2 + ecosomega**2
+    e     = esinomega**2 + ecosomega**2
     omega = np.arctan2(esinomega, ecosomega)
     return calc_orbit(e, P_orb, T_peri, a_sini, omega, x) + a + b*x + c*x*x
 
-# The log likelihood function
 
 @jit(nopython=True)
 def log_likelihood(theta, x, y, yerr):
+    """
+    The log likelihood function
+    """
     modelval = model(theta, x)
     sigma2 = yerr ** 2 
     return -0.5 * np.sum((y - modelval) ** 2 / sigma2)
 
-# The log probability function, containing both the likelihood and the prior
-
-@jit(nopython=True) #bad performance!
+@jit(nopython=True)
 def log_probability(theta, x, y, yerr, prior_ranges):
+    """
+    The log probability function, containing both the likelihood and the prior
+    """
     lp = log_prior(theta, prior_ranges)
     if not np.isfinite(lp):
         return -np.inf
@@ -351,6 +375,10 @@ def log_probability(theta, x, y, yerr, prior_ranges):
 def run_mcmc(oc_jd, oc_oc, oc_sd, prior_ranges, initial_state,
               nsteps=6000, discard = 1000, thin = 200, processes=1,
               plot_oc = True, plot_triangle = True):
+    """
+    The function doing the MCMC calculations and the calculation of the final
+    parameters
+    """
 
     nwalkers, ndim = initial_state.shape
     
