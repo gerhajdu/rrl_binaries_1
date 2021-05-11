@@ -1,7 +1,7 @@
 # rrl_binaries_1
 
 This code and supporting Jupyter notebooks document our implentation of the O-C method for
-RR Lyrae variables using a modified Hertzsprung method, as well as their Marko-Chaing Monte Carlo
+RR Lyrae variables using a modified Hertzsprung method, as well as their Markov chain Monte Carlo
 fitting using the `emcee` package. We fit the O-C diagrams with a mixed model containing terms for
 both the light-travel time effect, as well as linear period change.
 
